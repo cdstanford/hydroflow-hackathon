@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use hydro_deploy::{Deployment, HydroflowCrate};
 use hydroflow_plus_cli_integration::{DeployProcessSpec, DeployClusterSpec};
 
-const NUM_PROCESSES: usize = 1;
+const NUM_PROCESSES: usize = 4;
 
 #[tokio::main]
 async fn main() {

@@ -3,8 +3,9 @@
 use hydroflow_plus::serde::{Serialize, Deserialize, de::DeserializeOwned};
 use hydroflow_plus::stream::Windowed;
 use hydroflow_plus::{*, stream::Async};
-use rand::Rng;
 use stageleft::*;
+
+use rand::Rng;
 use std::fmt::Debug;
 
 pub fn randomized_partition<'a, T: Serialize + DeserializeOwned, W, D: Deploy<'a>>(
@@ -78,14 +79,24 @@ pub fn distributed_reduce<'a, W, D: Deploy<'a>>(
     let partitioned = round_robin_partition::<_, _, D>(stream_of_data, cluster);
     let reduced = partitioned
         .map(q!(|(_id, data)| data))
-        .all_ticks()
+        .tick_batch()
 
-        .reduce(q!(|a, b| *a += b))
+        .reduce(q!(|a, b| {
+            // sleep for 1 second
+            // std::thread::sleep(std::time::Duration::from_secs(1));
+            *a += b
+        }))
         .send_bincode_interleaved(merge_process);
     reduced
         .all_ticks()
         .reduce(q!(|a, b| *a += b))
-        .map(q!(|data| data))
+        .map(q!(|data| {
+            // Difficult to print time since start_time
+            // will be better with support for singleton types
+            // print time since start_time
+            // println!("Time: {:?}", start_time.elapsed().unwrap());
+            data
+        }))
 }
 
 pub fn first_ten_distributed<'a, D: Deploy<'a>>(

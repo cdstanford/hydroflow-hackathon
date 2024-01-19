@@ -7,6 +7,7 @@ edition = "2021"
 [dependencies]
 # make sure to sync these to `flow_macro`!
 hydroflow_plus = { git = "https://github.com/hydro-project/hydroflow.git" }
+hydroflow = { git = "https://github.com/hydro-project/hydroflow.git", features = [ "debugging" ] }
 tokio = { version = "1.16", features = [ "full" ] }
 stageleft = { git = "https://github.com/hydro-project/hydroflow.git" }
 hydroflow_plus_cli_integration = { git = "https://github.com/hydro-project/hydroflow.git" }

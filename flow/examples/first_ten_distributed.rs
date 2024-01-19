@@ -1,5 +1,7 @@
+use std::cell::RefCell;
+
 use hydro_deploy::{Deployment, HydroflowCrate};
-use hydroflow_plus_cli_integration::DeployProcessSpec;
+use hydroflow_plus_cli_integration::{DeployProcessSpec, DeployClusterSpec};
 
 #[tokio::main]
 async fn main() {
@@ -7,16 +9,28 @@ async fn main() {
     let localhost = deployment.Localhost();
 
     let flow = hydroflow_plus::FlowBuilder::new();
+    let deployment = RefCell::new(deployment);
     flow::first_ten_distributed::first_ten_distributed(
         &flow,
         &DeployProcessSpec::new(|| {
-            deployment.add_service(
+            deployment.borrow_mut().add_service(
                 HydroflowCrate::new(".", localhost.clone())
                     .bin("first_ten_distributed")
                     .profile("dev"),
             )
         }),
+        &DeployClusterSpec::new(|| {
+            let proc = deployment.borrow_mut().add_service(
+                HydroflowCrate::new(".", localhost.clone())
+                    .bin("first_ten_distributed")
+                    .profile("dev"),
+            );
+
+            vec![proc]
+        }),
     );
+
+    let mut deployment = deployment.into_inner();
 
     deployment.deploy().await.unwrap();
 

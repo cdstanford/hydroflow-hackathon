@@ -1,3 +1,5 @@
+use flow as flow_macro;
+
 #[tokio::main]
 async fn main() {
     hydroflow_plus::util::cli::launch(|ports| {

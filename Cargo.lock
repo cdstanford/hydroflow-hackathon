@@ -741,6 +741,8 @@ dependencies = [
  "hydroflow",
  "hydroflow_plus",
  "hydroflow_plus_cli_integration",
+ "rand",
+ "serde",
  "stageleft",
  "stageleft_tool",
  "tokio",
@@ -752,6 +754,8 @@ version = "0.0.0"
 dependencies = [
  "hydroflow_plus",
  "hydroflow_plus_cli_integration",
+ "rand",
+ "serde",
  "stageleft",
  "stageleft_tool",
  "tokio",

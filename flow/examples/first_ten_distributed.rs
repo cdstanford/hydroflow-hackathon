@@ -31,8 +31,18 @@ async fn main() {
                     .bin("first_ten_distributed")
                     .profile("dev"),
             );
+            let proc3 = deployment.add_service(
+                HydroflowCrate::new(".", localhost.clone())
+                    .bin("first_ten_distributed")
+                    .profile("dev"),
+            );
+            let proc4 = deployment.add_service(
+                HydroflowCrate::new(".", localhost.clone())
+                    .bin("first_ten_distributed")
+                    .profile("dev"),
+            );
 
-            vec![proc1, proc2]
+            vec![proc1, proc2, proc3, proc4]
         }),
     );
 

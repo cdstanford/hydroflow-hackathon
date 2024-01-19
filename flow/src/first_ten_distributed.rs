@@ -1,7 +1,54 @@
-use hydroflow_plus::serde::{Serialize, de::DeserializeOwned};
+use hydroflow_plus::serde::{self, Serialize, Deserialize, de::DeserializeOwned};
 use hydroflow_plus::{*, stream::Async};
+use rand::Rng;
 use stageleft::*;
+use std::fmt::Debug;
 
+#[allow(dead_code)]
+pub fn randomized_partition<'a, T: Serialize + DeserializeOwned, W, D: Deploy<'a>>(
+    stream_of_data: Stream<'a, T, W, D::Process>,
+    cluster: &D::Cluster,
+) -> Stream<'a, T, Async, D::Cluster> {
+    let cluster_ids = cluster.ids();
+    stream_of_data
+        .enumerate()
+        .map(q!(|(i, data)| {
+            let mut rng = rand::thread_rng();
+            (rng.gen_range(0..cluster_ids.len() as u32), data)
+        }))
+        .demux_bincode(cluster)
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum GossipMessage<T> {
+    Real(T),
+    Gossip(T),
+}
+
+pub fn randomized_gossip<'a, T: Debug + Serialize + DeserializeOwned, W, D: Deploy<'a>>(
+    stream_of_data: Stream<'a, T, W, D::Cluster>,
+    cluster: &D::Cluster,
+) -> Stream<'a, GossipMessage<T>, Async, D::Cluster> {
+    let cluster_ids = cluster.ids();
+    let real_messages = stream_of_data
+        .map(q!(|data| {
+            println!("real message: {:?}", data);
+            let mut rng = rand::thread_rng();
+            let target = rng.gen_range(0..cluster_ids.len()) as u32;
+            (target, GossipMessage::Real(data))
+        }))
+        .demux_bincode_interleaved(cluster);
+    let gossip_messages = stream_of_data
+        .map(q!(|data| {
+            let mut rng = rand::thread_rng();
+            let target = rng.gen_range(0..cluster_ids.len()) as u32;
+            (target, GossipMessage::Gossip(data))
+        }))
+        .demux_bincode_interleaved(cluster);
+    real_messages.union(&gossip_messages)
+}
+
+#[allow(dead_code)]
 pub fn add_one_to_each_element<'a, W, P: Location<'a>>(stream: Stream<'a, i32, W, P>) -> Stream<'a, i32, W, P> {
     stream.map(q!(|n| n + 1))
 }
@@ -30,8 +77,10 @@ pub fn first_ten_distributed<'a, D: Deploy<'a>>(
     //     .broadcast_bincode(&cluster)
     //     .for_each(q!(|n| println!("{}", n)));
 
-    round_robin_partition::<_, _, D>(numbers, &cluster)
-        .for_each(q!(|n| println!("{}", n)));
+    // round_robin_partition
+    let partitioned = round_robin_partition::<_, _, D>(numbers, &cluster);
+    randomized_gossip::<_, _, D>(partitioned, &cluster)
+        .for_each(q!(|n| println!("{:?}", n)));
 }
 
 use hydroflow_plus::util::cli::HydroCLI;

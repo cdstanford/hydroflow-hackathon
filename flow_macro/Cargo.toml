@@ -17,6 +17,8 @@ hydroflow_plus = { git = "https://github.com/hydro-project/hydroflow.git" }
 tokio = { version = "1.16", features = [ "full" ] }
 stageleft = { git = "https://github.com/hydro-project/hydroflow.git" }
 hydroflow_plus_cli_integration = { git = "https://github.com/hydro-project/hydroflow.git" }
+rand = "0.8.5"
+serde = "1.0.195"
 
 [build-dependencies]
 stageleft_tool = { git = "https://github.com/hydro-project/hydroflow.git" }

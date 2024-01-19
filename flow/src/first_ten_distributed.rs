@@ -1,8 +1,20 @@
-use hydroflow_plus::*;
+use hydroflow_plus::serde::{Serialize, de::DeserializeOwned};
+use hydroflow_plus::{*, stream::Async};
 use stageleft::*;
 
 pub fn add_one_to_each_element<'a, W, P: Location<'a>>(stream: Stream<'a, i32, W, P>) -> Stream<'a, i32, W, P> {
     stream.map(q!(|n| n + 1))
+}
+
+pub fn round_robin_partition<'a, T: Serialize + DeserializeOwned, W, D: Deploy<'a>>(
+    stream_of_data: Stream<'a, T, W, D::Process>,
+    cluster: &D::Cluster,
+) -> Stream<'a, T, Async, D::Cluster> {
+    let cluster_ids = cluster.ids();
+    stream_of_data
+        .enumerate()
+        .map(q!(|(i, data)| ((i % cluster_ids.len()) as u32, data)))
+        .demux_bincode(cluster)
 }
 
 pub fn first_ten_distributed<'a, D: Deploy<'a>>(
@@ -15,8 +27,10 @@ pub fn first_ten_distributed<'a, D: Deploy<'a>>(
 
     let numbers = process.source_iter(q!(0..10));
     // add_one_to_each_element(numbers)
-    add_one_to_each_element(numbers)
-        .broadcast_bincode(&cluster)
+    //     .broadcast_bincode(&cluster)
+    //     .for_each(q!(|n| println!("{}", n)));
+
+    round_robin_partition::<_, _, D>(numbers, &cluster)
         .for_each(q!(|n| println!("{}", n)));
 }
 

@@ -20,13 +20,19 @@ async fn main() {
             )
         }),
         &DeployClusterSpec::new(|| {
-            let proc = deployment.borrow_mut().add_service(
+            let mut deployment = deployment.borrow_mut();
+            let proc1 = deployment.add_service(
+                HydroflowCrate::new(".", localhost.clone())
+                    .bin("first_ten_distributed")
+                    .profile("dev"),
+            );
+            let proc2 = deployment.add_service(
                 HydroflowCrate::new(".", localhost.clone())
                     .bin("first_ten_distributed")
                     .profile("dev"),
             );
 
-            vec![proc]
+            vec![proc1, proc2]
         }),
     );
 

@@ -1,10 +1,12 @@
+#![allow(dead_code)]
+
 use hydroflow_plus::serde::{Serialize, Deserialize, de::DeserializeOwned};
+use hydroflow_plus::stream::Windowed;
 use hydroflow_plus::{*, stream::Async};
 use rand::Rng;
 use stageleft::*;
 use std::fmt::Debug;
 
-#[allow(dead_code)]
 pub fn randomized_partition<'a, T: Serialize + DeserializeOwned, W, D: Deploy<'a>>(
     stream_of_data: Stream<'a, T, W, D::Process>,
     cluster: &D::Cluster,
@@ -46,7 +48,6 @@ pub fn randomized_gossip<'a, T: Debug + Serialize + DeserializeOwned, W, D: Depl
     real_messages.union(&gossip_messages)
 }
 
-#[allow(dead_code)]
 pub fn add_one_to_each_element<'a, W, P: Location<'a>>(stream: Stream<'a, i32, W, P>) -> Stream<'a, i32, W, P> {
     stream.map(q!(|n| n + 1))
 }
@@ -65,6 +66,28 @@ pub fn round_robin_partition<'a, T: Serialize + DeserializeOwned, W, D: Deploy<'
         .demux_bincode(cluster)
 }
 
+pub fn distributed_reduce<'a, W, D: Deploy<'a>>(
+    stream_of_data: Stream<'a, i128, W, D::Process>,
+    cluster: &D::Cluster,
+    merge_process: &D::Process,
+    // init: T,
+    // accum: impl Fn(T, T) -> T + Clone + 'a,
+    // merge: impl Fn(T, T) -> T + Clone + 'a,
+    // finalize: impl Fn(T) -> T + Clone + 'a,
+) -> Stream<'a, i128, Windowed, D::Process> {
+    let partitioned = round_robin_partition::<_, _, D>(stream_of_data, cluster);
+    let reduced = partitioned
+        .map(q!(|(_id, data)| data))
+        .all_ticks()
+
+        .reduce(q!(|a, b| *a += b))
+        .send_bincode_interleaved(merge_process);
+    reduced
+        .all_ticks()
+        .reduce(q!(|a, b| *a += b))
+        .map(q!(|data| data))
+}
+
 pub fn first_ten_distributed<'a, D: Deploy<'a>>(
     flow: &'a FlowBuilder<'a, D>,
     process_spec: &impl ProcessSpec<'a, D>,
@@ -73,14 +96,16 @@ pub fn first_ten_distributed<'a, D: Deploy<'a>>(
     let process = flow.process(process_spec);
     let cluster = flow.cluster(cluster_spec);
 
-    let numbers = process.source_iter(q!(0..10));
+    let numbers = process.source_iter(q!(0..1000000));
     // add_one_to_each_element(numbers)
     //     .broadcast_bincode(&cluster)
     //     .for_each(q!(|n| println!("{}", n)));
 
-    // round_robin_partition
-    let partitioned = round_robin_partition::<_, _, D>(numbers, &cluster);
-    randomized_gossip::<_, _, D>(partitioned, &cluster)
+    // let partitioned = round_robin_partition::<_, _, D>(numbers, &cluster);
+    // randomized_gossip::<_, _, D>(partitioned, &cluster)
+    //     .for_each(q!(|n| println!("{:?}", n)));
+
+    distributed_reduce::<_, D>(numbers, &cluster, &process)
         .for_each(q!(|n| println!("{:?}", n)));
 }
 
@@ -99,9 +124,9 @@ pub fn first_ten_distributed_runtime<'a>(
 #[stageleft::runtime]
 #[cfg(test)]
 mod tests {
-    use hydro_deploy::{Deployment, HydroflowCrate};
-    use hydroflow_plus::futures::StreamExt;
-    use hydroflow_plus_cli_integration::{DeployCrateWrapper, DeployProcessSpec};
+    // use hydro_deploy::{Deployment, HydroflowCrate};
+    // use hydroflow_plus::futures::StreamExt;
+    // use hydroflow_plus_cli_integration::{DeployCrateWrapper, DeployProcessSpec};
 
     // #[tokio::test]
     // async fn first_ten_distributed() {

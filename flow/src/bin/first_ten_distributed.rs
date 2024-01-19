@@ -1,4 +1,5 @@
-use flow as flow_macro;
+// Fun hack: uncomment if using a custom datatype
+// use flow as flow_macro;
 
 #[tokio::main]
 async fn main() {

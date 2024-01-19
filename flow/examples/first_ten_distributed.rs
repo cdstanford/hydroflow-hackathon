@@ -3,6 +3,8 @@ use std::cell::RefCell;
 use hydro_deploy::{Deployment, HydroflowCrate};
 use hydroflow_plus_cli_integration::{DeployProcessSpec, DeployClusterSpec};
 
+const NUM_PROCESSES: usize = 1;
+
 #[tokio::main]
 async fn main() {
     let mut deployment = Deployment::new();
@@ -21,28 +23,17 @@ async fn main() {
         }),
         &DeployClusterSpec::new(|| {
             let mut deployment = deployment.borrow_mut();
-            let proc1 = deployment.add_service(
-                HydroflowCrate::new(".", localhost.clone())
-                    .bin("first_ten_distributed")
-                    .profile("dev"),
-            );
-            let proc2 = deployment.add_service(
-                HydroflowCrate::new(".", localhost.clone())
-                    .bin("first_ten_distributed")
-                    .profile("dev"),
-            );
-            let proc3 = deployment.add_service(
-                HydroflowCrate::new(".", localhost.clone())
-                    .bin("first_ten_distributed")
-                    .profile("dev"),
-            );
-            let proc4 = deployment.add_service(
-                HydroflowCrate::new(".", localhost.clone())
-                    .bin("first_ten_distributed")
-                    .profile("dev"),
-            );
 
-            vec![proc1, proc2, proc3, proc4]
+            let mut processes = Vec::new();
+            for _ in 0..NUM_PROCESSES {
+                processes.push(deployment.add_service(
+                    HydroflowCrate::new(".", localhost.clone())
+                        .bin("first_ten_distributed")
+                        .profile("dev"),
+                ))
+            }
+
+            processes
         }),
     );
 

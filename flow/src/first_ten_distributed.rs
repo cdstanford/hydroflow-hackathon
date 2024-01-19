@@ -1,4 +1,4 @@
-use hydroflow_plus::serde::{self, Serialize, Deserialize, de::DeserializeOwned};
+use hydroflow_plus::serde::{Serialize, Deserialize, de::DeserializeOwned};
 use hydroflow_plus::{*, stream::Async};
 use rand::Rng;
 use stageleft::*;
@@ -12,7 +12,7 @@ pub fn randomized_partition<'a, T: Serialize + DeserializeOwned, W, D: Deploy<'a
     let cluster_ids = cluster.ids();
     stream_of_data
         .enumerate()
-        .map(q!(|(i, data)| {
+        .map(q!(|(_, data)| {
             let mut rng = rand::thread_rng();
             (rng.gen_range(0..cluster_ids.len() as u32), data)
         }))
@@ -26,23 +26,21 @@ pub enum GossipMessage<T> {
 }
 
 pub fn randomized_gossip<'a, T: Debug + Serialize + DeserializeOwned, W, D: Deploy<'a>>(
-    stream_of_data: Stream<'a, T, W, D::Cluster>,
+    stream_of_data: Stream<'a, (u32, T), W, D::Cluster>,
     cluster: &D::Cluster,
-) -> Stream<'a, GossipMessage<T>, Async, D::Cluster> {
+) -> Stream<'a, (u32, GossipMessage<T>), Async, D::Cluster> {
     let cluster_ids = cluster.ids();
     let real_messages = stream_of_data
-        .map(q!(|data| {
-            println!("real message: {:?}", data);
-            let mut rng = rand::thread_rng();
-            let target = rng.gen_range(0..cluster_ids.len()) as u32;
-            (target, GossipMessage::Real(data))
+        .map(q!(|(id, data)| {
+            println!("id: {}, real message: {:?}", id, data);
+            (id, GossipMessage::Real(data))
         }))
-        .demux_bincode_interleaved(cluster);
+        .demux_bincode_tagged(cluster);
     let gossip_messages = stream_of_data
-        .map(q!(|data| {
+        .map(q!(|(_, data)| {
             let mut rng = rand::thread_rng();
             let target = rng.gen_range(0..cluster_ids.len()) as u32;
-            (target, GossipMessage::Gossip(data))
+            (target, (target, GossipMessage::Gossip(data)))
         }))
         .demux_bincode_interleaved(cluster);
     real_messages.union(&gossip_messages)
@@ -56,11 +54,14 @@ pub fn add_one_to_each_element<'a, W, P: Location<'a>>(stream: Stream<'a, i32, W
 pub fn round_robin_partition<'a, T: Serialize + DeserializeOwned, W, D: Deploy<'a>>(
     stream_of_data: Stream<'a, T, W, D::Process>,
     cluster: &D::Cluster,
-) -> Stream<'a, T, Async, D::Cluster> {
+) -> Stream<'a, (u32, T), Async, D::Cluster> {
     let cluster_ids = cluster.ids();
     stream_of_data
         .enumerate()
-        .map(q!(|(i, data)| ((i % cluster_ids.len()) as u32, data)))
+        .map(q!(|(i, data)| {
+            let id = (i % cluster_ids.len()) as u32;
+            (id, (id, data))
+        }))
         .demux_bincode(cluster)
 }
 
